@@ -1,0 +1,676 @@
+<html lang="ko">
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>특근·야간 급여 및 기본급 계산기</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --border-color: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 12px; width: 100%; max-width: 1000px; margin: 0 auto; padding-bottom: 80px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px; }
+        h1 { font-size: 1.15rem; font-weight: 700; color: var(--primary-color); }
+        
+        .card { background: var(--card-bg); border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px; width: 100%; }
+        
+        /* 상단 아이콘 전용 메뉴 바 */
+        .action-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+        .action-btn { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 2px; text-align: center; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; }
+        .action-btn:hover { border-color: var(--primary-color); background: #eff6ff; }
+        .action-btn .icon { font-size: 1.3rem; line-height: 1.2; }
+        .action-btn .val { font-size: 0.75rem; font-weight: 700; color: var(--primary-color); margin-top: 2px; }
+
+        /* 캘린더 영역 */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calendar-header button { background: none; border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; }
+        .weekdays div:first-child { color: #dc2626; } /* 일요일 빨간색 */
+        .weekdays div:last-child { color: #2563eb; }  /* 토요일 파란색 */
+        .weekdays div:not(:first-child):not(:last-child) { color: var(--text-sub); }
+
+        .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        
+        .day-cell { min-height: 90px; background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+        .day-cell.other-month { background: #f8fafc; opacity: 0.4; }
+        .day-num { font-size: 0.9rem; font-weight: 600; }
+        
+        /* 요일별 날짜 글자색 */
+        .day-cell.sun .day-num, .day-cell.holiday .day-num { color: #dc2626; }
+        .day-cell.sat .day-num { color: #2563eb; }
+
+        .cell-top { display: flex; flex-direction: column; align-items: flex-start; }
+        .badge-container { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+        
+        .badge { font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; color: white; font-weight: bold; }
+        .badge-special { background: #10b981; } /* 특근 */
+        .badge-night { background: #f59e0b; }   /* 야간 */
+        .badge-annual { background: #3b82f6; }  /* 연차 */
+        .badge-half { background: #06b6d4; }    /* 반차 */
+        .badge-icon { background: transparent; padding: 0; font-size: 0.8rem; line-height: 1; } /* 식사 아이콘 */
+        .badge-etc { background: #64748b; }   /* 기타 */
+
+        /* 모달 공통 스타일 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: white; width: 95%; max-width: 550px; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 85vh; overflow-y: auto; }
+        .modal-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.85rem; color: var(--text-sub); margin-bottom: 4px; }
+        .form-group select, .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; }
+        
+        .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+        .btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-secondary { background: #e2e8f0; color: var(--text-main); }
+        .btn-danger { background: #dc2626; color: white; }
+
+        .stat-list { display: flex; flex-direction: column; gap: 10px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 0.95rem; }
+        .stat-row span:last-child { font-weight: 700; color: var(--primary-color); }
+
+        /* 월별 연간 통계 테이블 스타일 */
+        .yearly-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 10px; }
+        .yearly-table th, .yearly-table td { border: 1px solid var(--border-color); padding: 6px 2px; text-align: center; }
+        .yearly-table th { background: #f1f5f9; font-weight: 600; color: var(--text-main); }
+        .yearly-table tr:last-child { background: #eff6ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>⚡ 급여 및 식대·근무 계산기</h1>
+        <div id="current-month-label" style="font-weight: 600; color: var(--text-sub);"></div>
+    </header>
+
+    <!-- 상단 아이콘 전용 메뉴 바 -->
+    <div class="action-bar">
+        <div class="action-btn" onclick="openModal('summary')" title="월간 요약">
+            <div class="icon">📊</div>
+            <div class="val" id="badge-total-pay">0원</div>
+        </div>
+        <div class="action-btn" onclick="openModal('yearly')" title="연간 통계 (월별)">
+            <div class="icon">📅</div>
+            <div class="val" id="badge-yearly-pay">연간</div>
+        </div>
+        <div class="action-btn" onclick="openModal('meal')" title="식대 현황">
+            <div class="icon">🍱</div>
+            <div class="val" id="badge-meal-count">0일</div>
+        </div>
+        <div class="action-btn" onclick="openModal('stats')" title="근무 통계">
+            <div class="icon">⏱️</div>
+            <div class="val" id="badge-total-hours">0시간</div>
+        </div>
+        <div class="action-btn" onclick="openModal('settings')" title="급여 및 설정">
+            <div class="icon">⚙️</div>
+            <div class="val" style="color: var(--text-sub);">설정</div>
+        </div>
+    </div>
+
+    <!-- 캘린더 카드 -->
+    <div class="card">
+        <div class="calendar-header">
+            <button onclick="changeMonth(-1)">◀ 이전</button>
+            <span id="calendar-title" style="font-weight: bold; font-size: 1.1rem;"></span>
+            <button onclick="changeMonth(1)">다음 ▶</button>
+        </div>
+        <div class="weekdays">
+            <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+        </div>
+        <div class="days-grid" id="days-container"></div>
+    </div>
+
+    <!-- 날짜 상세 입력 모달 -->
+    <div class="modal" id="day-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span id="modal-date-title">날짜 설정</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>근무 형태</label>
+                <select id="work-type" onchange="toggleFields()">
+                    <option value="normal">일반 근무</option>
+                    <option value="special">특근 (8시간)</option>
+                    <option value="night">야간 근무 (4시간)</option>
+                    <option value="annual">연차</option>
+                    <option value="half">반차</option>
+                    <option value="etc">기타</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>식사 여부</label>
+                <select id="meal-type">
+                    <option value="eaten">🍱 식사 함 (먹음)</option>
+                    <option value="none">❌ 미식사 (안먹음)</option>
+                </select>
+            </div>
+            <div class="form-group" id="memo-group" style="display: none;">
+                <label>기타 메모</label>
+                <input type="text" id="etc-memo" placeholder="메모 내용을 입력하세요">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveDayData()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 연간 월별 통계 모달 -->
+    <div class="modal" id="yearly-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>📅 연간 월별 통계</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+                <label>조회 연도 선택</label>
+                <select id="yearly-select-year" onchange="calculateYearlySummary()">
+                    <!-- 자바스크립트로 동적 생성 -->
+                </select>
+            </div>
+            
+            <div style="overflow-x: auto; max-height: 350px;">
+                <table class="yearly-table">
+                    <thead>
+                        <tr>
+                            <th>월</th>
+                            <th>특근</th>
+                            <th>야간</th>
+                            <th>연차</th>
+                            <th>반차</th>
+                            <th>식사</th>
+                            <th>예상 총급여</th>
+                        </tr>
+                    </thead>
+                    <tbody id="yearly-table-body">
+                        <!-- 월별 데이터 삽입 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-btns" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="closeModal()">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 식대 상세 현황 모달 -->
+    <div class="modal" id="meal-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>🍱 이번 달 식대 현황</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="stat-list">
+                <div class="stat-row"><span>1식당 식대 단가</span><span id="stat-meal-unit">0 원</span></div>
+                <div class="stat-row"><span>총 식사 일수</span><span id="stat-meal-count">0 일</span></div>
+                <div class="stat-row" style="background: #f3e8ff; border: 1px solid #8b5cf6;">
+                    <span style="font-weight: 700; color: #6b21a8;">총 식대 합계</span>
+                    <span id="stat-meal-total" style="font-size: 1.1rem; color: #6b21a8;">0 원</span>
+                </div>
+            </div>
+            <div class="modal-btns" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="closeModal()">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 월간 요약 모달 -->
+    <div class="modal" id="summary-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>📊 이번 달 급여 요약</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="stat-list">
+                <div class="stat-row"><span>기본급</span><span id="summary-base">0 원</span></div>
+                <div class="stat-row"><span>고정 수당</span><span id="summary-allowance">0 원</span></div>
+                <div class="stat-row"><span>특근 및 야간 수당</span><span id="summary-extra">0 원</span></div>
+                <div class="stat-row" style="background: #eff6ff; border: 1px solid var(--primary-color);">
+                    <span style="font-weight: 700;">예상 총 급여</span>
+                    <span id="summary-total" style="font-size: 1.1rem;">0 원</span>
+                </div>
+            </div>
+            <div class="modal-btns" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="closeModal()">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 근무 통계 모달 -->
+    <div class="modal" id="stats-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>⏱️ 이번 달 근무 통계</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="stat-list">
+                <div class="stat-row"><span>특근 횟수</span><span id="stat-special-count">0 회</span></div>
+                <div class="stat-row"><span>야간 근무 횟수</span><span id="stat-night-count">0 회</span></div>
+                <div class="stat-row"><span>연차 횟수</span><span id="stat-annual-count">0 회</span></div>
+                <div class="stat-row"><span>반차 횟수</span><span id="stat-half-count">0 회</span></div>
+                <div class="stat-row"><span>총 식사 횟수</span><span id="stat-total-meals">0 일</span></div>
+            </div>
+            <div class="modal-btns" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="closeModal()">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 설정 모달 -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>⚙️ 급여 설정</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>기본급 (원)</label>
+                <input type="number" id="base-salary" value="2000000" onchange="updateSettings()">
+            </div>
+            <div class="form-group">
+                <label>고정 수당 (원)</label>
+                <input type="number" id="fixed-allowance" value="200000" onchange="updateSettings()">
+            </div>
+            <div class="form-group">
+                <label>1식당 식대 단가 (원)</label>
+                <input type="number" id="meal-price" value="8000" onchange="updateSettings()">
+            </div>
+            <div class="form-group">
+                <label>기본 시급 (원)</label>
+                <input type="number" id="hourly-wage" value="10000" onchange="updateSettings()">
+            </div>
+            <div class="modal-btns" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="closeModal()">저장 및 확인</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let currentDate = new Date();
+    let selectedDateStr = "";
+    let workData = JSON.parse(localStorage.getItem('workData') || "{}");
+    
+    let baseSalary = parseInt(localStorage.getItem('baseSalary') || "2000000");
+    let fixedAllowance = parseInt(localStorage.getItem('fixedAllowance') || "200000");
+    let mealPrice = parseInt(localStorage.getItem('mealPrice') || "8000");
+    let hourlyWage = parseInt(localStorage.getItem('hourlyWage') || "10000");
+
+    document.getElementById('base-salary').value = baseSalary;
+    document.getElementById('fixed-allowance').value = fixedAllowance;
+    document.getElementById('meal-price').value = mealPrice;
+    document.getElementById('hourly-wage').value = hourlyWage;
+
+    function initYearSelect() {
+        const select = document.getElementById('yearly-select-year');
+        const currentYear = currentDate.getFullYear();
+        select.innerHTML = "";
+        for (let y = currentYear + 1; y >= currentYear - 3; y--) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.innerText = `${y}년`;
+            if (y === currentYear) opt.selected = true;
+            select.appendChild(opt);
+        }
+    }
+
+    function updateSettings() {
+        baseSalary = parseInt(document.getElementById('base-salary').value) || 0;
+        fixedAllowance = parseInt(document.getElementById('fixed-allowance').value) || 0;
+        mealPrice = parseInt(document.getElementById('meal-price').value) || 0;
+        hourlyWage = parseInt(document.getElementById('hourly-wage').value) || 0;
+
+        localStorage.setItem('baseSalary', baseSalary);
+        localStorage.setItem('fixedAllowance', fixedAllowance);
+        localStorage.setItem('mealPrice', mealPrice);
+        localStorage.setItem('hourlyWage', hourlyWage);
+
+        calculateMonthlySummary();
+    }
+
+    function toggleFields() {
+        const type = document.getElementById('work-type').value;
+        const memoGroup = document.getElementById('memo-group');
+        
+        if (type === 'etc') {
+            memoGroup.style.display = 'block';
+        } else {
+            memoGroup.style.display = 'none';
+            document.getElementById('etc-memo').value = '';
+        }
+    }
+
+    // 양력 날짜를 "M-D" 문자열로 변환
+    function getSolarKey(dateObj) {
+        return (dateObj.getMonth() + 1) + "-" + dateObj.getDate();
+    }
+
+    // 해당 연도의 대체공휴일 및 공휴일 포함 여부 판단 함수
+    function isHoliday(year, month, day, dateStr) {
+        const dateObj = new Date(year, month, day);
+        const dayOfWeek = dateObj.getDay(); // 0: 일요일, 6: 토요일
+
+        // 1. 고정 공휴일 정의 (월-일)
+        const fixedHolidays = {
+            "1-1": "신정",
+            "3-1": "삼일절",
+            "5-5": "어린이날",
+            "6-6": "현충일",
+            "8-15": "광복절",
+            "10-3": "개천절",
+            "10-9": "한글날",
+            "12-25": "성탄절"
+        };
+
+        const key = `${month + 1}-${day}`;
+        if (fixedHolidays[key]) {
+            return true;
+        }
+
+        // 2. 음양력 기반 주요 명절 (설날, 추석, 부처님오신날 등 2024~2027 주요 날짜 매핑 예시 및 일반화 계산)
+        // 2026년 기준 명절/대체일 정의
+        const dynamicHolidays2026 = [
+            "2026-2-16", "2026-2-17", "2026-2-18", // 설날 연휴
+            "2026-5-24", "2026-5-25", // 부처님오신날 및 대체공휴일
+            "2026-9-24", "2026-9-25", "2026-9-26" // 추석 연휴
+        ];
+        if (dynamicHolidays2026.includes(dateStr)) {
+            return true;
+        }
+
+        // 3. 대체공휴일 자동 계산 로직 (주말과 겹치는 공휴일 처리)
+        // 대상: 삼일절, 어린이날, 광복절, 개천절, 한글날, 설날/추석연휴
+        // 간단 구현: 만약 당일이 일요일이거나 공휴일인데 주말과 겹쳐서 다음 평일이 대체공휴일이 되는 경우 체크
+        const prevDate = new Date(year, month, day - 1);
+        const prevKey = getSolarKey(prevDate);
+        
+        // 어린이날이 토/일요일인 경우 직후 평일(월요일) 대체공휴일
+        if (key === "5-6" && (new Date(year, 4, 5).getDay() === 0 || new Date(year, 4, 5).getDay() === 6)) return true;
+        
+        // 3·1, 광복절, 개천절, 한글날이 토요일이나 일요일인 경우 직후 첫 번째 비공휴일(월요일 등) 대체공휴일 지정 법안 적용
+        const subCheckKeys = ["3-1", "8-15", "10-3", "10-9"];
+        for (let subKey of subCheckKeys) {
+            const [sm, sd] = subKey.split('-').map(Number);
+            const holidayObj = new Date(year, sm - 1, sd);
+            const hDayOfWeek = holidayObj.getDay();
+            if (hDayOfWeek === 0 || hDayOfWeek === 6) {
+                // 주말과 겹쳤을 때의 대체공휴일 계산 (가장 가까운 평일 월요일)
+                let altDate = new Date(year, sm - 1, sd);
+                if (hDayOfWeek === 6) altDate.setDate(altDate.getDate() + 2); // 토요일 -> 월요일
+                if (hDayOfWeek === 0) altDate.setDate(altDate.getDate() + 1); // 일요일 -> 월요일
+                
+                if (dateStr === `${altDate.getFullYear()}-${String(altDate.getMonth() + 1).padStart(2, '0')}-${String(altDate.getDate()).padStart(2, '0')}`) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        
+        document.getElementById('calendar-title').innerText = `${year}년 ${month + 1}월`;
+        document.getElementById('current-month-label').innerText = `${month + 1}월 현황`;
+
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const prevLastDay = new Date(year, month, 0).getDate();
+
+        const container = document.getElementById('days-container');
+        container.innerHTML = "";
+
+        for (let i = firstDayIndex; i > 0; i--) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'day-cell other-month';
+            dayCell.innerHTML = `<span class="day-num">${prevLastDay - i + 1}</span>`;
+            container.appendChild(dayCell);
+        }
+
+        for (let i = 1; i <= lastDay; i++) {
+            const dayCell = document.createElement('div');
+            const dateObj = new Date(year, month, i);
+            const dayOfWeek = dateObj.getDay();
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            
+            let cellClass = 'day-cell';
+            if (dayOfWeek === 0) {
+                cellClass += ' sun';
+            } else if (dayOfWeek === 6) {
+                cellClass += ' sat';
+            } else if (isHoliday(year, month, i, dateStr)) {
+                cellClass += ' holiday'; // 공휴일 및 대체공휴일 빨간색 처리
+            }
+
+            dayCell.className = cellClass;
+            
+            let mealHTML = '';
+            let badgesHTML = '';
+
+            if (workData[dateStr]) {
+                const data = workData[dateStr];
+
+                if (data.meal === 'eaten') {
+                    mealHTML = `<span class="badge badge-icon">🍱</span>`;
+                }
+
+                if (data.type === 'special') badgesHTML += `<span class="badge badge-special">특근</span>`;
+                if (data.type === 'night') badgesHTML += `<span class="badge badge-night">야간</span>`;
+                if (data.type === 'annual') badgesHTML += `<span class="badge badge-annual">연차</span>`;
+                if (data.type === 'half') badgesHTML += `<span class="badge badge-half">반차</span>`;
+                if (data.type === 'etc') {
+                    const badgeText = data.memo ? data.memo : '기타';
+                    badgesHTML += `<span class="badge badge-etc">${badgeText}</span>`;
+                }
+            }
+
+            dayCell.innerHTML = `
+                <div class="cell-top">
+                    <span class="day-num">${i}</span>
+                    ${mealHTML}
+                </div>
+                <div class="badge-container">${badgesHTML}</div>
+            `;
+            dayCell.onclick = () => openDayModal(dateStr);
+            container.appendChild(dayCell);
+        }
+
+        calculateMonthlySummary();
+    }
+
+    function changeMonth(direction) {
+        currentDate.setMonth(currentDate.getMonth() + direction);
+        renderCalendar();
+    }
+
+    function openDayModal(dateStr) {
+        selectedDateStr = dateStr;
+        document.getElementById('modal-date-title').innerText = `${dateStr} 근무 설정`;
+        
+        const data = workData[dateStr] || { type: 'normal', meal: 'none', memo: '' };
+        document.getElementById('work-type').value = data.type;
+        document.getElementById('meal-type').value = data.meal || 'none';
+        document.getElementById('etc-memo').value = data.memo || '';
+
+        toggleFields();
+        document.getElementById('day-modal').style.display = 'flex';
+    }
+
+    function openModal(modalType) {
+        if (modalType === 'summary') {
+            document.getElementById('summary-modal').style.display = 'flex';
+        } else if (modalType === 'yearly') {
+            initYearSelect();
+            calculateYearlySummary();
+            document.getElementById('yearly-modal').style.display = 'flex';
+        } else if (modalType === 'meal') {
+            document.getElementById('meal-modal').style.display = 'flex';
+        } else if (modalType === 'stats') {
+            document.getElementById('stats-modal').style.display = 'flex';
+        } else if (modalType === 'settings') {
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+    }
+
+    function closeModal() {
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    }
+
+    function saveDayData() {
+        const type = document.getElementById('work-type').value;
+        const meal = document.getElementById('meal-type').value;
+        const memo = document.getElementById('etc-memo').value.trim();
+
+        if (type === 'normal' && meal === 'none' && !memo) {
+            delete workData[selectedDateStr];
+        } else {
+            workData[selectedDateStr] = { type, meal, memo };
+        }
+
+        localStorage.setItem('workData', JSON.stringify(workData));
+        closeModal();
+        renderCalendar();
+    }
+
+    function calculateMonthlySummary() {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        
+        let totalExtraPay = 0;
+        let specialCount = 0;
+        let nightCount = 0;
+        let annualCount = 0;
+        let halfCount = 0;
+        let mealCount = 0;
+
+        for (const [dateStr, data] of Object.entries(workData)) {
+            if (dateStr.startsWith(`${year}-${month}`)) {
+                if (data.type === 'special') {
+                    specialCount++;
+                    totalExtraPay += (8 * hourlyWage * 1.5);
+                } else if (data.type === 'night') {
+                    nightCount++;
+                    totalExtraPay += (4 * hourlyWage * 1.5);
+                }
+
+                if (data.type === 'annual') annualCount++;
+                if (data.type === 'half') halfCount++;
+                if (data.meal === 'eaten') mealCount++;
+            }
+        }
+
+        const totalMealPay = mealCount * mealPrice;
+        const finalTotalPay = baseSalary + fixedAllowance + totalExtraPay;
+
+        document.getElementById('badge-total-pay').innerText = `${Math.round(finalTotalPay).toLocaleString()}원`;
+        document.getElementById('badge-meal-count').innerText = `${mealCount}일`;
+        
+        const totalHours = (specialCount * 8) + (nightCount * 4);
+        document.getElementById('badge-total-hours').innerText = `${totalHours}시간`;
+
+        document.getElementById('stat-meal-unit').innerText = `${mealPrice.toLocaleString()} 원`;
+        document.getElementById('stat-meal-count').innerText = `${mealCount} 일`;
+        document.getElementById('stat-meal-total').innerText = `${totalMealPay.toLocaleString()} 원`;
+
+        document.getElementById('summary-base').innerText = `${baseSalary.toLocaleString()} 원`;
+        document.getElementById('summary-allowance').innerText = `${fixedAllowance.toLocaleString()} 원`;
+        document.getElementById('summary-extra').innerText = `${Math.round(totalExtraPay).toLocaleString()} 원`;
+        document.getElementById('summary-total').innerText = `${Math.round(finalTotalPay).toLocaleString()} 원`;
+
+        document.getElementById('stat-special-count').innerText = `${specialCount} 회`;
+        document.getElementById('stat-night-count').innerText = `${nightCount} 회`;
+        document.getElementById('stat-annual-count').innerText = `${annualCount} 회`;
+        document.getElementById('stat-half-count').innerText = `${halfCount} 회`;
+        document.getElementById('stat-total-meals').innerText = `${mealCount} 일`;
+    }
+
+    function calculateYearlySummary() {
+        const selectedYear = parseInt(document.getElementById('yearly-select-year').value);
+        if (!selectedYear) return;
+
+        let tableHTML = "";
+        let sumSpecial = 0;
+        let sumNight = 0;
+        let sumAnnual = 0;
+        let sumHalf = 0;
+        let sumMeal = 0;
+        let sumPay = 0;
+
+        for (let m = 1; m <= 12; m++) {
+            const monthStr = String(m).padStart(2, '0');
+            let mSpecial = 0;
+            let mNight = 0;
+            let mAnnual = 0;
+            let mHalf = 0;
+            let mMeal = 0;
+            let mExtraPay = 0;
+
+            for (const [dateStr, data] of Object.entries(workData)) {
+                if (dateStr.startsWith(`${selectedYear}-${monthStr}-`)) {
+                    if (data.type === 'special') {
+                        mSpecial++;
+                        mExtraPay += (8 * hourlyWage * 1.5);
+                    } else if (data.type === 'night') {
+                        mNight++;
+                        mExtraPay += (4 * hourlyWage * 1.5);
+                    }
+                    if (data.type === 'annual') mAnnual++;
+                    if (data.type === 'half') mHalf++;
+                    if (data.meal === 'eaten') mMeal++;
+                }
+            }
+
+            const mTotalPay = baseSalary + fixedAllowance + mExtraPay;
+
+            sumSpecial += mSpecial;
+            sumNight += mNight;
+            sumAnnual += mAnnual;
+            sumHalf += mHalf;
+            sumMeal += mMeal;
+            sumPay += mTotalPay;
+
+            tableHTML += `
+                <tr>
+                    <td><strong>${m}월</strong></td>
+                    <td>${mSpecial}회</td>
+                    <td>${mNight}회</td>
+                    <td>${mAnnual}회</td>
+                    <td>${mHalf}회</td>
+                    <td>${mMeal}일</td>
+                    <td>${Math.round(mTotalPay).toLocaleString()}원</td>
+                </tr>
+            `;
+        }
+
+        tableHTML += `
+            <tr>
+                <td><strong>합계</strong></td>
+                <td><strong>${sumSpecial}회</strong></td>
+                <td><strong>${sumNight}회</strong></td>
+                <td><strong>${sumAnnual}회</strong></td>
+                <td><strong>${sumHalf}회</strong></td>
+                <td><strong>${sumMeal}일</strong></td>
+                <td><strong>${Math.round(sumPay).toLocaleString()}원</strong></td>
+            </tr>
+        `;
+
+        document.getElementById('yearly-table-body').innerHTML = tableHTML;
+    }
+
+    renderCalendar();
+</script>
+
+</body>
+</html>
